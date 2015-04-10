@@ -1,7 +1,8 @@
 {
   "preset": "google",
   "requireSpaceAfterLineComment": true,
-  "maximumLineLength": 200,
+  "validateIndentation": 2,
+  "maximumLineLength": 150,
   "validateJSDoc": {
     "checkParamNames": true,
     "checkRedundantParams": true,
