@@ -13,6 +13,7 @@ module.exports = {
   createDirectory: rateLimit(createDirectory),
   copyFile: rateLimit(copyFile),
   npmInstall: rateLimit(npmInstall),
+  npmDedupe: rateLimit(npmDedupe),
   createDependencyGraph: rateLimit(createDependencyGraph),
   cachePackage: rateLimit(cachePackage),
   getPathToNpmCache: rateLimit(getPathToNpmCache)
@@ -44,6 +45,10 @@ function copyFile(from, to) {
 
 function npmInstall() {
   return execAsync('npm install');
+}
+
+function npmDedupe() {
+  return execAsync('npm dedupe');
 }
 
 function createDependencyGraph() {

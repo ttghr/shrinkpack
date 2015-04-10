@@ -52,6 +52,7 @@ function prepare(options) {
       shell.createDirectory(options.paths.nodeShrinkwrap),
       shell.npmInstall()
     ])
+    .then(shell.npmDedupe)
     .then(function() {
       return options;
     });
