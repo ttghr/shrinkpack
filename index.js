@@ -2,11 +2,8 @@
 
 'use strict';
 
-var PWD = process.env.PWD || process.cwd();
-
-var fs = require('fs');
-var is = require('is');
 var path = require('path');
+var dependencyGraph = require('./src/dependency-graph');
 var shell = require('./src/shell');
 var when = require('when');
 
@@ -14,26 +11,47 @@ return shell.getPathToNpmCache()
   .then(getOptions)
   .then(clean)
   .then(prepare)
-  .then(createDependencyGraph)
-  .then(readDependencyGraph)
-  .then(npmCacheDependencies)
-  .then(saveDependencies)
-  .then(updateDependencyGraph)
-  .then(saveDependencyGraph);
+  .then(dependencyGraph.create)
+  .then(dependencyGraph.get)
+  .then(dependencyGraph.items.get)
+  .then(dependencyGraph.items.saveToNpmCache)
+  .then(dependencyGraph.items.saveToProject)
+  .then(dependencyGraph.items.repoint)
+  .then(dependencyGraph.save);
 
 function getOptions(npmCachePath) {
-  return {
+
+  var PWD = process.env.PWD || process.cwd();
+  var options = {
     dependencies: {
       graph: null,
       all: []
     },
     paths: {
+      project: PWD,
+      npmCache: npmCachePath,
       nodeModules: joinAbsolute(PWD, 'node_modules'),
-      nodeShrinkwrap: joinAbsolute(PWD, 'node_shrinkwrap'),
       npmShrinkwrap: joinAbsolute(PWD, 'npm-shrinkwrap.json'),
-      npmCache: npmCachePath
+      nodeShrinkwrap: joinAbsolute(PWD, 'node_shrinkwrap'),
+      nodeShrinkwrapItem: getPathToPackageInShrinkwrap,
+      npmCacheItem: getPathToPackageInNpmCache
     }
   };
+
+  return options;
+
+  function getPathToPackageInNpmCache(item) {
+    return joinAbsolute(
+      options.paths.npmCache, item.name, item.meta.version, '/package.tgz'
+    );
+  }
+
+  function getPathToPackageInShrinkwrap(item) {
+    return joinAbsolute(
+      options.paths.nodeShrinkwrap, item.name + '-' + item.meta.version + '.tgz'
+    );
+  }
+
 }
 
 function clean(options) {
@@ -58,89 +76,8 @@ function prepare(options) {
     });
 }
 
-function createDependencyGraph(options) {
-  return shell.createDependencyGraph()
-    .then(function() {
-      return options;
-    });
-}
-
-function readDependencyGraph(options) {
-  options.dependencies.graph = require(options.paths.npmShrinkwrap);
-  crawlDependencyGraph(options.dependencies.graph, function(name, meta) {
-    options.dependencies.all.push({
-      name: name,
-      meta: meta
-    });
-  });
-  return options;
-}
-
-function npmCacheDependencies(options) {
-  return when.all(
-      options.dependencies.all.map(function(dependency) {
-        return shell.cachePackage(dependency.name, dependency.meta.version);
-      })
-    )
-    .then(function() {
-      return options;
-    });
-}
-
-function saveDependencies(options) {
-  return when.all(
-      options.dependencies.all.map(function(dependency) {
-        return shell.copyFile(
-          getPathToNpmCache(options, dependency),
-          getShrinkwrapPath(options, dependency)
-        );
-      })
-    )
-    .then(function() {
-      return options;
-    });
-}
-
-function updateDependencyGraph(options) {
-  options.dependencies.all.forEach(function(dependency) {
-    dependency.meta.resolved = path.relative(PWD, getShrinkwrapPath(options, dependency));
-  });
-  return options;
-}
-
-function saveDependencyGraph(options) {
-  fs.writeFileSync(
-    options.paths.npmShrinkwrap,
-    JSON.stringify(options.dependencies.graph, null, 2)
-  );
-  return options;
-}
-
-function getPathToNpmCache(options, dependency) {
-  return joinAbsolute(
-    options.paths.npmCache, dependency.name, dependency.meta.version, '/package.tgz'
-  );
-}
-
-function getShrinkwrapPath(options, dependency) {
-  return joinAbsolute(
-    options.paths.nodeShrinkwrap, dependency.name + '-' + dependency.meta.version + '.tgz'
-  );
-}
-
 function joinAbsolute() {
   return path.resolve(
     path.join.apply(path, [].slice.call(arguments))
   );
-}
-
-function crawlDependencyGraph(object, fn, key) {
-  if (is.object(object)) {
-    if (is.string(object.resolved)) {
-      fn(key, object);
-    }
-    Object.keys(object).forEach(function(key) {
-      crawlDependencyGraph(object[key], fn, key);
-    });
-  }
 }
