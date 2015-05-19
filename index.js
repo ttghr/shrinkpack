@@ -105,7 +105,7 @@ module.exports = {
 
         saveOperations.push(
           terminal
-          .exec('npm cache add ' + shortName)
+          .exec('npm cache add "' + value.from + '"')
           .then(function() {
             log.info('save', log.underline(packed));
             shell.cp('-f', cached, packed);
